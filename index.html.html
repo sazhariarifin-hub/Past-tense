@@ -1,0 +1,771 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>LKPD Time Machine</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: one boarding-pass hero, then four "jump" cards stacked in a single column, then a results card. */
+:root{
+  --bg:#EEF3FB; --surface:#FFFFFF; --ink:#14213D; --muted:#55607E; --line:#C9D4EC;
+  --brand:#2F5BFF; --on-brand:#FFFFFF; --brand-soft:#E3EAFF;
+  --sun:#FFC53D; --sun-soft:#FFF0C2; --coral:#FF6B57;
+  --good:#13805A; --good-soft:#DCF4E9; --bad:#C93434; --bad-soft:#FCE2E0;
+  --shadow:0 1px 0 rgba(20,33,61,.06),0 10px 28px rgba(20,33,61,.09);
+  --f-display:'Fredoka','Trebuchet MS',system-ui,sans-serif;
+  --f-body:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1430; --surface:#152046; --ink:#E8EEFF; --muted:#A0ADD0; --line:#2A3868;
+    --brand:#86A2FF; --on-brand:#0C1430; --brand-soft:#1F2E66;
+    --sun:#FFC53D; --sun-soft:#3B3312; --coral:#FF8A75;
+    --good:#5ED6A6; --good-soft:#123B31; --bad:#FF9690; --bad-soft:#4A2230;
+    --shadow:0 1px 0 rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1430; --surface:#152046; --ink:#E8EEFF; --muted:#A0ADD0; --line:#2A3868;
+  --brand:#86A2FF; --on-brand:#0C1430; --brand-soft:#1F2E66;
+  --sun:#FFC53D; --sun-soft:#3B3312; --coral:#FF8A75;
+  --good:#5ED6A6; --good-soft:#123B31; --bad:#FF9690; --bad-soft:#4A2230;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:780px;margin:0 auto}
+h1,h2,h3,p{margin:0}
+h1,h2{font-family:var(--f-display);font-weight:600;text-wrap:balance;line-height:1.15}
+.mono{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+
+/* Boarding pass hero */
+.ticket{background:var(--surface);border-radius:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.ticket-top{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:10px;align-items:center;padding:22px 22px 14px}
+.hero-art{min-width:0}
+.hero-art svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}
+.hero-copy{min-width:0;display:grid;gap:12px}
+.hero-copy h1{font-size:clamp(2rem,6vw,2.9rem)}
+.hero-copy p.lead{color:var(--muted);max-width:46ch}
+.route{display:flex;align-items:center;gap:10px;font-family:var(--f-mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.route .line{flex:1;min-width:24px;border-top:3px dotted var(--brand);position:relative}
+.route .line::after{content:"";position:absolute;right:-2px;top:-8px;border:6px solid transparent;border-left:9px solid var(--brand);border-right:0}
+.perf{position:relative;border-top:2px dashed var(--line);margin:0 18px}
+.perf::before,.perf::after{content:"";position:absolute;top:-14px;width:26px;height:26px;border-radius:50%;background:var(--bg)}
+.perf::before{left:-31px}
+.perf::after{right:-31px}
+.ticket-bottom{display:grid;grid-template-columns:1.3fr .6fr 1fr;gap:14px;padding:16px 22px 22px}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input{font:700 17px var(--f-body);color:var(--ink);background:transparent;border:0;border-bottom:2px solid var(--line);padding:4px 0;width:100%;min-width:0;border-radius:0}
+.field input:focus{border-bottom-color:var(--brand);outline:none}
+.field input:focus-visible{outline:3px solid var(--brand);outline-offset:4px;border-radius:4px}
+@media (max-width:620px){
+  .ticket-top{grid-template-columns:1fr;padding:18px 18px 12px}
+  .ticket-bottom{grid-template-columns:1fr 1fr;padding:14px 18px 18px}
+  .field.wide{grid-column:1/-1}
+}
+
+/* Tracker */
+.tracker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 0}
+.stop{display:flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;border-radius:999px;background:var(--surface);border:2px solid var(--line);font:700 13px var(--f-body)}
+.stop b{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--brand-soft);font:600 13px var(--f-display);color:var(--ink)}
+.stop small{font:600 12px var(--f-body);color:var(--muted)}
+.stop.done{border-color:var(--good)}
+.stop.done b{background:var(--good);color:var(--surface)}
+.stop.prog{border-color:var(--sun)}
+.stop.prog b{background:var(--sun);color:#14213D}
+.scorepill{margin-left:auto;font:500 13px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.scorepill strong{color:var(--ink);font-weight:500}
+
+/* Instruction card */
+.howto{margin-top:18px;border-radius:18px;background:var(--sun-soft);padding:16px 18px;display:grid;gap:6px}
+.howto h2{font-size:1.1rem}
+.howto ul{margin:0;padding-left:1.2em;display:grid;gap:2px}
+
+/* Jump cards */
+.jump{background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:20px;margin-top:18px}
+.jump-head{display:flex;gap:16px;align-items:center;padding-bottom:16px;border-bottom:2px dashed var(--line);margin-bottom:14px}
+.jump-head .ico{flex:none;width:76px;height:76px}
+.jump-head > div{min-width:0;display:grid;gap:4px}
+.jump-head h2{font-size:1.5rem}
+.jump-head p{color:var(--muted)}
+.ico text{font:600 11px var(--f-display);fill:var(--ink)}
+@media (max-width:480px){ .jump{padding:16px} .jump-head .ico{width:60px;height:60px} .jump-head h2{font-size:1.25rem} }
+
+.inp{font:700 16px var(--f-body);color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:9px 12px;min-width:0;width:100%}
+.inp:focus{border-color:var(--brand)}
+.inp:disabled{opacity:1;color:var(--ink);-webkit-text-fill-color:var(--ink)}
+.btn{font:800 16px var(--f-body);color:var(--on-brand);background:var(--brand);border:2px solid var(--ink);border-radius:14px;padding:11px 20px;cursor:pointer;box-shadow:0 3px 0 var(--ink);min-height:46px}
+.btn:active{transform:translateY(3px);box-shadow:none}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn[hidden]{display:none}
+.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:16px}
+.subscore{font:600 15px var(--f-display);background:var(--brand-soft);border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums}
+
+.chip{font:700 14px var(--f-body);color:var(--ink);background:transparent;border:2px solid var(--line);border-radius:999px;padding:7px 14px;min-height:38px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.chip:disabled{cursor:default}
+.chip:disabled:not([aria-pressed="true"]){opacity:.55}
+
+.fb{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:1.45;min-width:0}
+.fb:empty{display:none}
+.fb span{min-width:0}
+.fbi{flex:none;width:18px;height:18px;margin-top:1px}
+
+/* Part A */
+.rowsA{display:grid;gap:6px}
+.rowA{display:grid;grid-template-columns:26px minmax(0,.8fr) minmax(0,1.2fr) auto;gap:8px 12px;align-items:center;padding:10px;border-radius:14px;border:2px solid transparent}
+.rowA:nth-child(odd){background:var(--bg)}
+.rowA .num{font:500 13px var(--f-mono);color:var(--muted)}
+.rowA .base{font:600 1.25rem var(--f-display)}
+.rowA .types{display:flex;gap:6px;flex-wrap:wrap}
+.rowA .fb{grid-column:2/-1}
+@media (max-width:560px){ .rowA{grid-template-columns:26px minmax(0,.8fr) minmax(0,1.2fr)} .rowA .types{grid-column:2/-1} }
+.rowA.ok,.rowB.ok,.rowC.ok,.rowX.ok{background:var(--good-soft);border-color:var(--good)}
+.rowA.half,.rowB.half,.rowC.half{background:var(--sun-soft);border-color:var(--sun)}
+.rowA.bad,.rowB.bad,.rowC.bad,.rowX.bad{background:var(--bad-soft);border-color:var(--bad)}
+
+/* Part B */
+.rowsB{display:grid;gap:8px}
+.rowB{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px 14px;align-items:center;padding:12px;border-radius:14px;border:2px solid var(--line)}
+.rowB svg{width:48px;height:48px}
+.rowB .sent{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:1.05rem;min-width:0}
+.rowB .sent .inp{width:9.5rem;padding:6px 10px}
+.rowB .hint{font:500 13px var(--f-mono);color:var(--muted)}
+.rowB .fb{grid-column:1/-1}
+
+/* Part C */
+.rowsC{display:grid;gap:12px}
+.rowC{display:grid;gap:10px;padding:14px;border-radius:16px;border:2px solid var(--line)}
+.rowC .wrong{font-size:1.1rem;font-weight:700}
+.rowC mark{background:transparent;color:var(--bad);text-decoration:underline wavy var(--bad);text-underline-offset:5px;text-decoration-thickness:2px}
+.rowC .q{font:500 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.opts{display:grid;gap:6px}
+.opt{font:600 14px var(--f-body);text-align:left;color:var(--ink);background:transparent;border:2px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;line-height:1.35}
+.opt[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.opt:disabled{cursor:default}
+
+/* Part D */
+.tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){ .tiers{grid-template-columns:1fr} }
+.tier{position:relative;display:block;cursor:pointer}
+.tier input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.tier span{display:grid;gap:2px;height:100%;padding:10px 12px;border:2px solid var(--line);border-radius:14px;font-size:13px;color:var(--muted)}
+.tier span b{font:600 1rem var(--f-display);color:var(--ink)}
+.tier input:checked + span{border-color:var(--brand);background:var(--brand-soft)}
+.tier input:focus-visible + span{outline:3px solid var(--brand);outline-offset:2px}
+.frame{margin:12px 0 8px;font:500 13px var(--f-mono);color:var(--muted)}
+textarea.inp{min-height:150px;resize:vertical;line-height:1.5;font-weight:600}
+.checks{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.checks li{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.coach{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--sun-soft);font-size:14px;display:grid;gap:2px}
+.coach:empty{display:none}
+.note{font-size:14px;color:var(--muted);margin-top:10px}
+
+/* Challenge */
+.rowsX{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.rowX{display:grid;gap:6px;padding:10px;border-radius:14px;border:2px solid var(--line);align-content:start}
+.rowX .base{font:600 1.15rem var(--f-display)}
+
+/* Results */
+.result{background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:22px;margin-top:18px;display:grid;gap:14px}
+.result-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+.result-head h2{font-size:1.5rem}
+.stamp{border:3px solid var(--brand);color:var(--brand);border-radius:10px;padding:3px 12px;font:600 17px var(--f-display);letter-spacing:.08em;text-transform:uppercase;transform:rotate(-5deg)}
+.sum{width:100%;border-collapse:collapse}
+.sum td{padding:8px 0;border-bottom:1px dashed var(--line)}
+.sum td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:800}
+.sum tr.total td{border-bottom:0;font:600 1.5rem var(--f-display);padding-top:12px}
+.teacher{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+.teacher select{font:700 15px var(--f-body);color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:6px 10px}
+.msg{font-size:1.05rem}
+.foot{text-align:center;margin-top:22px}
+
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes dash{to{stroke-dashoffset:-48}}
+.machine{animation:float 4.5s ease-in-out infinite}
+.orbit{animation:dash 7s linear infinite}
+@media (prefers-reduced-motion: reduce){ .machine,.orbit{animation:none} }
+</style>
+
+<div class="wrap">
+
+  <header class="ticket">
+    <div class="ticket-top">
+      <div class="hero-art">
+        <svg viewBox="0 0 300 230" role="img" aria-label="Ilustrasi mesin waktu berbentuk kapsul biru dengan jam besar di tengahnya">
+          <circle cx="150" cy="118" r="98" fill="var(--sun-soft)"/>
+          <g fill="var(--brand)">
+            <path transform="translate(40 50)" d="M0 -9 L2.5 -2.5 9 0 2.5 2.5 0 9 -2.5 2.5 -9 0 -2.5 -2.5Z"/>
+            <path transform="translate(262 62) scale(.8)" d="M0 -9 L2.5 -2.5 9 0 2.5 2.5 0 9 -2.5 2.5 -9 0 -2.5 -2.5Z"/>
+            <path transform="translate(272 168) scale(1.1)" d="M0 -9 L2.5 -2.5 9 0 2.5 2.5 0 9 -2.5 2.5 -9 0 -2.5 -2.5Z"/>
+            <path transform="translate(34 188) scale(.7)" d="M0 -9 L2.5 -2.5 9 0 2.5 2.5 0 9 -2.5 2.5 -9 0 -2.5 -2.5Z"/>
+          </g>
+          <ellipse class="orbit" cx="150" cy="122" rx="132" ry="34" transform="rotate(-14 150 122)" fill="none" stroke="var(--brand)" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>
+          <g stroke="var(--brand)" stroke-width="4" stroke-linecap="round">
+            <line x1="14" y1="108" x2="46" y2="108"/><line x1="6" y1="128" x2="38" y2="128"/><line x1="18" y1="148" x2="44" y2="148"/>
+          </g>
+          <g class="machine">
+            <path d="M130 186 Q150 234 170 186Z" fill="var(--coral)"/>
+            <path d="M140 186 Q150 216 160 186Z" fill="var(--sun)"/>
+            <path d="M98 148 L60 192 L114 178Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>
+            <path d="M202 148 L240 192 L186 178Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>
+            <line x1="150" y1="58" x2="150" y2="36" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="150" cy="30" r="9" fill="var(--sun)" stroke="var(--ink)" stroke-width="4"/>
+            <path d="M150 54 C206 54 232 100 232 140 C232 176 204 190 150 190 C96 190 68 176 68 140 C68 100 94 54 150 54Z" fill="var(--brand)" stroke="var(--ink)" stroke-width="5" stroke-linejoin="round"/>
+            <path d="M96 104 C104 82 122 68 142 64" fill="none" stroke="#FFFFFF" stroke-opacity=".55" stroke-width="7" stroke-linecap="round"/>
+            <circle cx="150" cy="128" r="44" fill="var(--surface)" stroke="var(--ink)" stroke-width="5"/>
+            <g stroke="var(--ink)" stroke-width="4" stroke-linecap="round">
+              <line x1="150" y1="92" x2="150" y2="99"/><line x1="150" y1="157" x2="150" y2="164"/>
+              <line x1="114" y1="128" x2="121" y2="128"/><line x1="179" y1="128" x2="186" y2="128"/>
+              <line x1="150" y1="128" x2="133" y2="114" stroke-width="6"/>
+              <line x1="150" y1="128" x2="169" y2="104" stroke-width="5"/>
+            </g>
+            <circle cx="150" cy="128" r="6" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"/>
+            <path d="M142 172 l-10 6 10 6Z M156 172 l-10 6 10 6Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="86" cy="140" r="4" fill="var(--sun)" stroke="var(--ink)" stroke-width="2"/>
+            <circle cx="214" cy="140" r="4" fill="var(--sun)" stroke="var(--ink)" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+      <div class="hero-copy">
+        <p class="mono">LKPD · Bahasa Inggris · Kelas 7</p>
+        <h1>Misi Mesin Waktu</h1>
+        <p class="lead">Naik mesin waktu, kembali ke kemarin, dan ubah kata kerja ke bentuk past. Selesaikan empat jump dan satu tantangan.</p>
+        <div class="route" aria-label="Rute perjalanan dari sekarang ke kemarin"><span>Now</span><span class="line"></span><span>Yesterday</span></div>
+      </div>
+    </div>
+    <div class="perf" aria-hidden="true"></div>
+    <div class="ticket-bottom">
+      <div class="field wide"><label for="f-name">Nama penumpang</label><input id="f-name" type="text" autocomplete="off" placeholder="Tulis namamu"></div>
+      <div class="field"><label for="f-class">Kelas</label><input id="f-class" type="text" autocomplete="off" placeholder="7A"></div>
+      <div class="field"><label for="f-date">Tanggal berangkat</label><input id="f-date" type="date"></div>
+    </div>
+  </header>
+
+  <div class="tracker" id="tracker" aria-label="Kemajuan misi">
+    <div class="stop" id="st-A"><b>A</b><small id="st-A-t">belum</small></div>
+    <div class="stop" id="st-B"><b>B</b><small id="st-B-t">belum</small></div>
+    <div class="stop" id="st-C"><b>C</b><small id="st-C-t">belum</small></div>
+    <div class="stop" id="st-D"><b>D</b><small id="st-D-t">belum</small></div>
+    <div class="stop" id="st-X"><b>★</b><small id="st-X-t">belum</small></div>
+    <div class="scorepill">Skor otomatis <strong id="tr-score">0 / 80</strong></div>
+  </div>
+
+  <section class="howto" aria-labelledby="howto-h">
+    <h2 id="howto-h">Petunjuk</h2>
+    <ul>
+      <li>Part A sampai C boleh kamu diskusikan dengan temanmu.</li>
+      <li>Part D adalah tulisanmu sendiri, jadi kerjakan dengan jujur.</li>
+      <li>Tekan tombol Periksa di akhir setiap jump. Setelah diperiksa, jawaban terkunci dan kunci jawabannya muncul.</li>
+    </ul>
+  </section>
+
+  <!-- Part A -->
+  <section class="jump" aria-labelledby="ha">
+    <div class="jump-head">
+      <svg class="ico" viewBox="0 0 72 72" aria-hidden="true">
+        <rect x="4" y="6" width="42" height="24" rx="7" fill="var(--brand-soft)" stroke="var(--ink)" stroke-width="3"/>
+        <text x="25" y="22" text-anchor="middle">walk</text>
+        <path d="M36 34 v10" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M30 40 l6 7 l6 -7" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="26" y="46" width="42" height="24" rx="7" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"/>
+        <text x="47" y="62" text-anchor="middle">walked</text>
+      </svg>
+      <div>
+        <p class="mono">Jump 1 · Part A</p>
+        <h2 id="ha">Ubah ke bentuk past</h2>
+        <p>Tulis bentuk past dari setiap kata kerja, lalu pilih jenisnya: Regular atau Irregular.</p>
+      </div>
+    </div>
+    <div class="rowsA" id="a-rows"></div>
+    <div class="actions"><button type="button" class="btn" id="a-check">Periksa Part A</button><span class="subscore" id="a-score" hidden></span></div>
+  </section>
+
+  <!-- Part B -->
+  <section class="jump" aria-labelledby="hb">
+    <div class="jump-head">
+      <svg class="ico" viewBox="0 0 72 72" aria-hidden="true">
+        <rect x="10" y="6" width="44" height="60" rx="6" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/>
+        <line x1="19" y1="20" x2="45" y2="20" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/>
+        <rect x="19" y="29" width="20" height="9" rx="3" fill="var(--sun)" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="19" y1="48" x2="40" y2="48" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/>
+        <path d="M44 62 L58 34 L65 38 L51 66 L42 68Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p class="mono">Jump 2 · Part B</p>
+        <h2 id="hb">Lengkapi kalimat</h2>
+        <p>Isi titik-titik dengan bentuk past dari kata kerja di dalam kurung.</p>
+      </div>
+    </div>
+    <div class="rowsB" id="b-rows"></div>
+    <div class="actions"><button type="button" class="btn" id="b-check">Periksa Part B</button><span class="subscore" id="b-score" hidden></span></div>
+  </section>
+
+  <!-- Part C -->
+  <section class="jump" aria-labelledby="hc">
+    <div class="jump-head">
+      <svg class="ico" viewBox="0 0 72 72" aria-hidden="true">
+        <line x1="6" y1="26" x2="44" y2="26" stroke="var(--line)" stroke-width="6" stroke-linecap="round"/>
+        <line x1="6" y1="46" x2="30" y2="46" stroke="var(--line)" stroke-width="6" stroke-linecap="round"/>
+        <path d="M8 36 q4 -6 8 0 t8 0 t8 0" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="44" cy="32" r="18" fill="var(--sun-soft)" fill-opacity=".85" stroke="var(--ink)" stroke-width="4"/>
+        <path d="M36 26 q4 -6 11 -4" fill="none" stroke="#FFFFFF" stroke-opacity=".8" stroke-width="3" stroke-linecap="round"/>
+        <line x1="57" y1="45" x2="67" y2="58" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <p class="mono">Jump 3 · Part C</p>
+        <h2 id="hc">Temukan dan perbaiki kesalahan</h2>
+        <p>Setiap kalimat mengandung satu kesalahan. Tulis kalimat yang benar, lalu pilih alasannya.</p>
+      </div>
+    </div>
+    <div class="rowsC" id="c-rows"></div>
+    <div class="actions"><button type="button" class="btn" id="c-check">Periksa Part C</button><span class="subscore" id="c-score" hidden></span></div>
+  </section>
+
+  <!-- Part D -->
+  <section class="jump" aria-labelledby="hd">
+    <div class="jump-head">
+      <svg class="ico" viewBox="0 0 72 72" aria-hidden="true">
+        <rect x="12" y="6" width="46" height="60" rx="7" fill="var(--brand)" stroke="var(--ink)" stroke-width="3"/>
+        <rect x="12" y="6" width="9" height="60" rx="4" fill="var(--ink)" fill-opacity=".25"/>
+        <path d="M45 6 v20 l5 -4 5 4 v-20Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+        <path transform="translate(36 46)" d="M0 -12 L3.5 -4 12 -3.5 5.5 2 7.5 11 0 6.5 -7.5 11 -5.5 2 -12 -3.5 -3.5 -4Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M52 66 L66 40 L71 43 L57 69Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p class="mono">Jump 4 · Part D · Mandiri</p>
+        <h2 id="hd">My Yesterday</h2>
+        <p>Ceritakan kemarinmu dengan jujur. Pilih tingkat yang sesuai untukmu.</p>
+      </div>
+    </div>
+    <div class="tiers" role="radiogroup" aria-label="Pilih tingkat">
+      <label class="tier"><input type="radio" name="tier" value="1" checked><span><b>Tingkat 1</b>3 kalimat dengan kerangka</span></label>
+      <label class="tier"><input type="radio" name="tier" value="2"><span><b>Tingkat 2</b>4-5 kalimat, minimal 2 kata kerja irregular, penanda waktu bervariasi</span></label>
+      <label class="tier"><input type="radio" name="tier" value="3"><span><b>Tingkat 3</b>5-6 kalimat, tambahkan because atau but</span></label>
+    </div>
+    <p class="frame" id="d-frame">Yesterday, I ... Then I ... After that, I ...</p>
+    <label class="mono" for="d-text">Ceritamu</label>
+    <textarea class="inp" id="d-text" rows="6" spellcheck="false" autocapitalize="sentences" placeholder="Yesterday, I ..."></textarea>
+    <ul class="checks" id="d-checks" aria-live="polite"></ul>
+    <div class="coach" id="d-coach" aria-live="polite"></div>
+    <p class="note">Part D dinilai oleh gurumu dengan rubrik. Daftar periksa di atas membantumu mengecek tulisanmu sendiri.</p>
+  </section>
+
+  <!-- Challenge -->
+  <section class="jump" aria-labelledby="hx">
+    <div class="jump-head">
+      <svg class="ico" viewBox="0 0 72 72" aria-hidden="true">
+        <path d="M36 4 C52 16 54 38 47 50 H25 C18 38 20 16 36 4Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="36" cy="28" r="8" fill="var(--brand)" stroke="var(--ink)" stroke-width="3"/>
+        <path d="M26 40 L12 56 L29 51Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M46 40 L60 56 L43 51Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M29 54 Q36 74 43 54Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <p class="mono">Bonus · Tidak dinilai</p>
+        <h2 id="hx">Tantangan</h2>
+        <p>Tulis bentuk past dari lima kata kerja ini. Semua termasuk irregular.</p>
+      </div>
+    </div>
+    <div class="rowsX" id="x-rows"></div>
+    <div class="actions"><button type="button" class="btn" id="x-check">Periksa tantangan</button><span class="subscore" id="x-score" hidden></span></div>
+  </section>
+
+  <!-- Results -->
+  <section class="result" aria-labelledby="hr">
+    <div class="result-head">
+      <h2 id="hr">Hasil Misi</h2>
+      <span class="stamp" id="stamp" hidden>Mendarat</span>
+    </div>
+    <table class="sum">
+      <tr><td>Part A · bentuk past</td><td id="r-A">belum diperiksa</td></tr>
+      <tr><td>Part B · lengkapi kalimat</td><td id="r-B">belum diperiksa</td></tr>
+      <tr><td>Part C · perbaiki kesalahan</td><td id="r-C">belum diperiksa</td></tr>
+      <tr><td>Part D · My Yesterday (rubrik guru × 5)</td><td id="r-D">menunggu guru</td></tr>
+      <tr><td>Tantangan (tidak dinilai)</td><td id="r-X">belum diperiksa</td></tr>
+      <tr class="total"><td>Total</td><td id="r-T">0 / 80</td></tr>
+    </table>
+    <p class="msg" id="r-msg">Selesaikan Part A sampai C untuk melihat hasilmu.</p>
+    <div class="teacher">
+      <label for="d-grade">Diisi guru: skor rubrik Part D</label>
+      <select id="d-grade"><option value="0">Belum dinilai</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+    </div>
+    <p class="note">Tunjukkan layar ini kepada gurumu atau ambil tangkapan layar. Hasil tidak tersimpan setelah halaman ditutup.</p>
+    <div class="actions"><button type="button" class="btn ghost" id="reset">Mulai ulang</button></div>
+  </section>
+
+  <p class="mono foot">Simple Past Tense · Kelas 7 · 20 menit</p>
+</div>
+
+<script id="logic">
+var LKPDLogic=(function(){
+  'use strict';
+  var A=[
+    {base:'walk',past:'walked',type:'R'},{base:'clean',past:'cleaned',type:'R'},
+    {base:'visit',past:'visited',type:'R'},{base:'study',past:'studied',type:'R'},
+    {base:'watch',past:'watched',type:'R'},{base:'go',past:'went',type:'I'},
+    {base:'eat',past:'ate',type:'I'},{base:'buy',past:'bought',type:'I'},
+    {base:'have',past:'had',type:'I'},{base:'take',past:'took',type:'I'}
+  ];
+  var B=[
+    {base:'drink',answer:'drank',regular:false,before:'Yesterday, I',after:'two glasses of water at school.',icon:'glass'},
+    {base:'play',answer:'played',regular:true,before:'My friends',after:'football after school.',icon:'ball'},
+    {base:'help',answer:'helped',regular:true,before:'Last night, my brother',after:'me with my homework.',icon:'book'},
+    {base:'make',answer:'made',regular:false,before:'She',after:'a cake for her mother last Sunday.',icon:'cake'},
+    {base:'come',answer:'came',regular:false,before:'We',after:'to school at 6.30 yesterday.',icon:'clock'}
+  ];
+  var C=[
+    {html:'I <mark>goed</mark> to the market yesterday.',wrong:'goed',verb:'went',key:'I went to the market yesterday.',reason:'I',why:'Go termasuk irregular, bentuk past-nya went, bukan goed.'},
+    {html:'She <mark>eated</mark> a banana last night.',wrong:'eated',verb:'ate',key:'She ate a banana last night.',reason:'I',why:'Eat termasuk irregular, bentuk past-nya ate.'},
+    {html:'They <mark>play</mark> badminton last Sunday.',wrong:'play',verb:'played',key:'They played badminton last Sunday.',reason:'R',why:'Last Sunday menunjukkan waktu lampau, jadi play menjadi played.'},
+    {html:'We <mark>watchd</mark> a movie yesterday.',wrong:'watchd',verb:'watched',key:'We watched a movie yesterday.',reason:'R',why:'Watch termasuk regular dan ditulis watched, bukan watchd.'},
+    {html:'He <mark>buyed</mark> a new bag two days ago.',wrong:'buyed',verb:'bought',key:'He bought a new bag two days ago.',reason:'I',why:'Buy termasuk irregular, bentuk past-nya bought.'}
+  ];
+  var REASONS=[
+    {v:'I',t:'Kata kerja irregular: bentuk past-nya berubah, bukan ditambah -ed'},
+    {v:'R',t:'Kata kerja regular: bentuk past dibuat dengan menambah -ed'},
+    {v:'N',t:'Bentuk kata kerjanya sudah benar karena kejadiannya sedang berlangsung'}
+  ];
+  var X=[{base:'run',past:'ran'},{base:'swim',past:'swam'},{base:'sing',past:'sang'},{base:'sleep',past:'slept'},{base:'give',past:'gave'}];
+  var TIERS=[
+    {id:1,min:3,frame:'Yesterday, I ... Then I ... After that, I ...'},
+    {id:2,min:4,frame:'Pakai minimal 2 kata kerja irregular dan penanda waktu seperti yesterday, then, after that, last night.'},
+    {id:3,min:5,frame:'Tambahkan because atau but untuk menjelaskan atau membandingkan.'}
+  ];
+  var IRR_PAST=['went','ate','saw','had','made','bought','came','took','wrote','drank','ran','swam','sang','slept','gave','got','did','was','were'];
+  var MARKERS=['yesterday','then','after that','last night','later','first','finally','last weekend','in the morning','in the afternoon','at night','after school','before school'];
+  var OVERGEN={goed:'went',eated:'ate',buyed:'bought',maked:'made',taked:'took',comed:'came',haved:'had',writed:'wrote',drinked:'drank',seed:'saw',runned:'ran',swimmed:'swam',singed:'sang',sleeped:'slept',gived:'gave',getted:'got',doed:'did'};
+  var BASE_IRR=['go','eat','see','have','make','buy','come','take','write','drink','run','swim','sing','sleep','give','get'];
+
+  function norm(s){return String(s==null?'':s).toLowerCase().replace(/[‘’`]/g,"'").trim().replace(/\s+/g,' ');}
+  function tokens(s){return norm(s).replace(/[.,!?;:"“”()]/g,' ').split(/\s+/).filter(Boolean);}
+  function oneEdit(a,b){
+    if(a===b) return true;
+    var la=a.length,lb=b.length;
+    if(Math.abs(la-lb)>1) return false;
+    var i=0,j=0,e=0;
+    while(i<la&&j<lb){
+      if(a[i]===b[j]){i++;j++;continue;}
+      if(++e>1) return false;
+      if(la>lb) i++; else if(lb>la) j++; else {i++;j++;}
+    }
+    if(i<la||j<lb) e++;
+    return e<=1;
+  }
+  function gradeA(it,val,typ){
+    var pastOk=norm(val)===it.past, typeOk=typ===it.type;
+    return {pastOk:pastOk,typeOk:typeOk,pts:(pastOk?2:0)+(typeOk?2:0)};
+  }
+  function gradeB(it,val){
+    var a=norm(val);
+    if(a===it.answer) return {pts:4,status:'ok'};
+    if(a&&it.regular&&a!==it.base&&oneEdit(a,it.answer)) return {pts:2,status:'near'};
+    return {pts:0,status:'bad'};
+  }
+  function sentenceOk(it,val){
+    var t=tokens(val),key=tokens(it.key);
+    if(t.indexOf(it.verb)<0||t.indexOf(it.wrong)>=0) return false;
+    var missing=0;
+    key.forEach(function(k){if(k!==it.verb&&t.indexOf(k)<0) missing++;});
+    return missing<=1;
+  }
+  function gradeC(it,val,reason){
+    var s=sentenceOk(it,val),r=reason===it.reason;
+    return {sentOk:s,reasonOk:r,pts:(s?2:0)+(r?2:0)};
+  }
+  function countSentences(text){
+    return String(text||'').split(/[.!?]+/).map(function(x){return x.trim();}).filter(function(x){return x.split(/\s+/).length>=2;}).length;
+  }
+  function has(t,phrase){return new RegExp('\\b'+phrase+'\\b').test(t);}
+  function found(t,list){return list.filter(function(w){return has(t,w);});}
+  function checkD(text,tier){
+    var t=norm(text),n=countSentences(text),min=TIERS[tier-1].min,items=[];
+    items.push({ok:n>=min,label:'Minimal '+min+' kalimat (sekarang '+n+')'});
+    if(tier===1){
+      var need=['yesterday','then','after that'],miss=need.filter(function(w){return !has(t,w);});
+      items.push({ok:miss.length===0,label:miss.length?'Pakai kerangka Yesterday, Then, After that (belum ada: '+miss.join(', ')+')':'Pakai kerangka Yesterday, Then, After that'});
+    } else {
+      var irr=found(t,IRR_PAST);
+      items.push({ok:irr.length>=2,label:'Minimal 2 kata kerja irregular bentuk past (ditemukan: '+(irr.length?irr.join(', '):'belum ada')+')'});
+      if(tier===2){
+        var tm=found(t,MARKERS);
+        items.push({ok:tm.length>=2,label:'Minimal 2 penanda waktu berbeda (ditemukan: '+(tm.length?tm.join(', '):'belum ada')+')'});
+      } else {
+        items.push({ok:has(t,'because')||has(t,'but'),label:'Pakai because atau but'});
+      }
+    }
+    return items;
+  }
+  function coach(text){
+    var tk=tokens(text),out=[],seen={};
+    tk.forEach(function(w){
+      if(OVERGEN[w]&&!seen[w]){seen[w]=1;out.push(w+' belum tepat. Bentuk past yang benar: '+OVERGEN[w]+'.');}
+    });
+    var base=tk.filter(function(w,i){return BASE_IRR.indexOf(w)>=0&&tk.indexOf(w)===i;});
+    if(base.length) out.push('Cek kata ini, apakah ceritanya tentang kemarin dan perlu bentuk past: '+base.join(', ')+'.');
+    return out;
+  }
+  function gradeX(it,val){return norm(val)===it.past;}
+  function total(p){return p.A+p.B+p.C;}
+  return {A:A,B:B,C:C,X:X,REASONS:REASONS,TIERS:TIERS,norm:norm,tokens:tokens,oneEdit:oneEdit,gradeA:gradeA,gradeB:gradeB,gradeC:gradeC,sentenceOk:sentenceOk,countSentences:countSentences,checkD:checkD,coach:coach,gradeX:gradeX,total:total};
+})();
+if(typeof module!=='undefined'&&module.exports){module.exports=LKPDLogic;}
+</script>
+
+<script id="ui">
+(function(){
+  'use strict';
+  var L=LKPDLogic;
+  var state;
+  function $(s,r){return (r||document).querySelector(s);}
+  function $all(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+  function fresh(){return {a:{},c:{},checked:{A:false,B:false,C:false,X:false},pts:{A:0,B:0,C:0},xr:0,tier:1,dState:'belum',dGrade:0};}
+
+  var I_OK='<svg class="fbi" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="var(--good)"/><path d="M5.5 10.5l3 3 6-6.5" fill="none" stroke="var(--surface)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var I_BAD='<svg class="fbi" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="var(--bad)"/><path d="M6.5 6.5l7 7M13.5 6.5l-7 7" fill="none" stroke="var(--surface)" stroke-width="2.2" stroke-linecap="round"/></svg>';
+  var I_HALF='<svg class="fbi" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="var(--sun)"/><path d="M10 5.5v5.5M10 13.6v.9" fill="none" stroke="#14213D" stroke-width="2.2" stroke-linecap="round"/></svg>';
+  var I_TODO='<svg class="fbi" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--muted)" stroke-width="2"/></svg>';
+
+  var B_ICONS={
+    glass:'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 8H36L32 42H16Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/><path d="M14 20H34L32 42H16Z" fill="var(--brand)" fill-opacity=".5"/></svg>',
+    ball:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/><polygon points="24,15 32,21 29,31 19,31 16,21" fill="var(--ink)"/><path d="M24 15V7M32 21l8-3M29 31l5 7M19 31l-5 7M16 21l-8-3" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    book:'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 12Q15 8 24 12Q33 8 42 12V38Q33 34 24 38Q15 34 6 38Z" fill="var(--sun-soft)" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/><line x1="24" y1="12" x2="24" y2="38" stroke="var(--ink)" stroke-width="2.5"/></svg>',
+    cake:'<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="27" width="32" height="14" rx="4" fill="var(--coral)" stroke="var(--ink)" stroke-width="3"/><rect x="12" y="18" width="24" height="10" rx="3" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"/><line x1="24" y1="11" x2="24" y2="18" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/><path d="M24 3q4 4 0 7q-4-3 0-7Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="2"/></svg>',
+    clock:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/><line x1="24" y1="24" x2="21.7" y2="32.7" stroke="var(--ink)" stroke-width="3.5" stroke-linecap="round"/><line x1="24" y1="24" x2="24" y2="37" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="2.5" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/></svg>'
+  };
+
+  function lockInputs(sel){$all(sel).forEach(function(el){el.disabled=true;});}
+
+  /* ---------- Render ---------- */
+  function renderA(){
+    var h='';
+    L.A.forEach(function(it,i){
+      h+='<div class="rowA" id="a-row-'+i+'"><span class="num">'+(i+1)+'</span><span class="base">'+it.base+'</span>'+
+        '<input class="inp" id="a-past-'+i+'" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Bentuk past dari '+it.base+'" placeholder="past form">'+
+        '<div class="types" role="group" aria-label="Jenis kata kerja '+it.base+'">'+
+        '<button type="button" class="chip" data-a="'+i+'" data-v="R" aria-pressed="false">Regular</button>'+
+        '<button type="button" class="chip" data-a="'+i+'" data-v="I" aria-pressed="false">Irregular</button></div>'+
+        '<div class="fb" id="a-fb-'+i+'" aria-live="polite"></div></div>';
+    });
+    $('#a-rows').innerHTML=h;
+  }
+  function renderB(){
+    var h='';
+    L.B.forEach(function(it,i){
+      h+='<div class="rowB" id="b-row-'+i+'">'+B_ICONS[it.icon]+
+        '<div class="sent"><span>'+it.before+'</span>'+
+        '<input class="inp" id="b-in-'+i+'" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Bentuk past dari '+it.base+' untuk kalimat '+(i+1)+'">'+
+        '<span class="hint">('+it.base+')</span><span>'+it.after+'</span></div>'+
+        '<div class="fb" id="b-fb-'+i+'" aria-live="polite"></div></div>';
+    });
+    $('#b-rows').innerHTML=h;
+  }
+  function renderC(){
+    var h='';
+    L.C.forEach(function(it,i){
+      h+='<div class="rowC" id="c-row-'+i+'"><p class="q">Kalimat '+(i+1)+'</p><p class="wrong">'+it.html+'</p>'+
+        '<input class="inp" id="c-in-'+i+'" type="text" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" aria-label="Tulis kalimat yang benar untuk kalimat '+(i+1)+'" placeholder="Tulis kalimat yang benar">'+
+        '<p class="q">Mengapa salah?</p><div class="opts" role="group" aria-label="Pilih alasan untuk kalimat '+(i+1)+'">';
+      L.REASONS.forEach(function(r){
+        h+='<button type="button" class="opt" data-c="'+i+'" data-v="'+r.v+'" aria-pressed="false">'+r.t+'</button>';
+      });
+      h+='</div><div class="fb" id="c-fb-'+i+'" aria-live="polite"></div></div>';
+    });
+    $('#c-rows').innerHTML=h;
+  }
+  function renderX(){
+    var h='';
+    L.X.forEach(function(it,i){
+      h+='<div class="rowX" id="x-row-'+i+'"><span class="base">'+it.base+'</span>'+
+        '<input class="inp" id="x-in-'+i+'" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Bentuk past dari '+it.base+'" placeholder="past form">'+
+        '<div class="fb" id="x-fb-'+i+'" aria-live="polite"></div></div>';
+    });
+    $('#x-rows').innerHTML=h;
+  }
+
+  /* ---------- Checks ---------- */
+  function checkA(){
+    if(state.checked.A) return;
+    var total=0;
+    L.A.forEach(function(it,i){
+      var g=L.gradeA(it,$('#a-past-'+i).value,state.a[i]||'');
+      total+=g.pts;
+      var row=$('#a-row-'+i),fb=$('#a-fb-'+i);
+      var ans='<b>'+it.past+'</b> · '+(it.type==='R'?'Regular':'Irregular');
+      row.classList.add(g.pts===4?'ok':(g.pts===2?'half':'bad'));
+      fb.innerHTML=g.pts===4?I_OK+'<span>Benar. +4</span>':(g.pts===2?I_HALF+'<span>Setengah benar. +2. Jawaban: '+ans+'</span>':I_BAD+'<span>Belum tepat. Jawaban: '+ans+'</span>');
+    });
+    lockInputs('#a-rows .inp');lockInputs('#a-rows .chip');
+    state.checked.A=true;state.pts.A=total;
+    $('#a-check').hidden=true;$('#a-score').hidden=false;$('#a-score').textContent='Skor Part A: '+total+' / 40';
+    refresh();
+  }
+  function checkB(){
+    if(state.checked.B) return;
+    var total=0;
+    L.B.forEach(function(it,i){
+      var g=L.gradeB(it,$('#b-in-'+i).value);
+      total+=g.pts;
+      var row=$('#b-row-'+i),fb=$('#b-fb-'+i);
+      row.classList.add(g.status==='ok'?'ok':(g.status==='near'?'half':'bad'));
+      fb.innerHTML=g.status==='ok'?I_OK+'<span>Benar. +4</span>':(g.status==='near'?I_HALF+'<span>Hampir benar. +2. Cek ejaannya. Jawaban: <b>'+it.answer+'</b></span>':I_BAD+'<span>Belum tepat. Jawaban: <b>'+it.answer+'</b></span>');
+    });
+    lockInputs('#b-rows .inp');
+    state.checked.B=true;state.pts.B=total;
+    $('#b-check').hidden=true;$('#b-score').hidden=false;$('#b-score').textContent='Skor Part B: '+total+' / 20';
+    refresh();
+  }
+  function checkC(){
+    if(state.checked.C) return;
+    var total=0;
+    L.C.forEach(function(it,i){
+      var g=L.gradeC(it,$('#c-in-'+i).value,state.c[i]||'');
+      total+=g.pts;
+      var row=$('#c-row-'+i),fb=$('#c-fb-'+i);
+      row.classList.add(g.pts===4?'ok':(g.pts===2?'half':'bad'));
+      var head=g.pts===4?I_OK+'<span><b>Benar. +4.</b> ':(g.pts===2?I_HALF+'<span><b>Setengah benar. +2.</b> '+(g.sentOk?'Kalimatmu sudah benar, alasannya belum tepat. ':'Alasanmu sudah tepat, kalimatmu belum. '):I_BAD+'<span><b>Belum tepat.</b> ');
+      fb.innerHTML=head+'Kalimat yang benar: <b>'+it.key+'</b><br>'+it.why+'</span>';
+    });
+    lockInputs('#c-rows .inp');lockInputs('#c-rows .opt');
+    state.checked.C=true;state.pts.C=total;
+    $('#c-check').hidden=true;$('#c-score').hidden=false;$('#c-score').textContent='Skor Part C: '+total+' / 20';
+    refresh();
+  }
+  function checkX(){
+    if(state.checked.X) return;
+    var right=0;
+    L.X.forEach(function(it,i){
+      var ok=L.gradeX(it,$('#x-in-'+i).value);
+      if(ok) right++;
+      $('#x-row-'+i).classList.add(ok?'ok':'bad');
+      $('#x-fb-'+i).innerHTML=ok?I_OK+'<span>Benar</span>':I_BAD+'<span>Jawaban: <b>'+it.past+'</b></span>';
+    });
+    lockInputs('#x-rows .inp');
+    state.checked.X=true;state.xr=right;
+    $('#x-check').hidden=true;$('#x-score').hidden=false;$('#x-score').textContent=right+' dari 5 benar';
+    refresh();
+  }
+
+  /* ---------- Part D ---------- */
+  function updateD(){
+    var text=$('#d-text').value;
+    var items=L.checkD(text,state.tier);
+    var ul=$('#d-checks');
+    ul.innerHTML=items.map(function(it){return '<li>'+(it.ok?I_OK:I_TODO)+'<span>'+it.label+'</span></li>';}).join('');
+    var hints=L.coach(text);
+    var co=$('#d-coach');
+    co.innerHTML='';
+    hints.forEach(function(h){var p=document.createElement('p');p.textContent=h;co.appendChild(p);});
+    var allOk=items.every(function(i){return i.ok;});
+    state.dState=allOk?'selesai':(text.trim()?'menulis':'belum');
+    refresh();
+  }
+  function setTier(n){
+    state.tier=n;
+    $('#d-frame').textContent=L.TIERS[n-1].frame;
+    updateD();
+  }
+
+  /* ---------- Tracker and results ---------- */
+  function setStop(id,cls,label){
+    var el=$('#st-'+id);
+    el.classList.remove('done','prog');
+    if(cls) el.classList.add(cls);
+    $('#st-'+id+'-t').textContent=label;
+  }
+  function refresh(){
+    var auto=L.total(state.pts);
+    $('#tr-score').textContent=auto+' / 80';
+    setStop('A',state.checked.A?'done':'',state.checked.A?'selesai':'belum');
+    setStop('B',state.checked.B?'done':'',state.checked.B?'selesai':'belum');
+    setStop('C',state.checked.C?'done':'',state.checked.C?'selesai':'belum');
+    setStop('D',state.dState==='selesai'?'done':(state.dState==='menulis'?'prog':''),state.dState);
+    setStop('X',state.checked.X?'done':'',state.checked.X?'selesai':'belum');
+    $('#r-A').textContent=state.checked.A?state.pts.A+' / 40':'belum diperiksa';
+    $('#r-B').textContent=state.checked.B?state.pts.B+' / 20':'belum diperiksa';
+    $('#r-C').textContent=state.checked.C?state.pts.C+' / 20':'belum diperiksa';
+    $('#r-X').textContent=state.checked.X?state.xr+' / 5':'belum diperiksa';
+    var g=state.dGrade;
+    $('#r-D').textContent=g>0?(g*5)+' / 20':'menunggu guru';
+    $('#r-T').textContent=g>0?(auto+g*5)+' / 100':auto+' / 80';
+    var all=state.checked.A&&state.checked.B&&state.checked.C;
+    $('#stamp').hidden=!all;
+    var pct=auto/80,msg='Selesaikan Part A sampai C untuk melihat hasilmu.';
+    if(all){
+      msg=pct>=0.85?'Pendaratan sempurna. Kamu sudah menguasai bentuk past dengan sangat baik.':
+          pct>=0.7?'Hampir sampai. Baca ulang jawaban yang salah bersama temanmu, lalu coba Part D dengan lebih percaya diri.':
+          pct>=0.5?'Perjalananmu sudah separuh jalan. Ulangi kata kerja irregular yang masih salah, lalu minta bantuan gurumu.':
+          'Salah itu bagian dari perjalanan. Bacalah kunci jawaban di setiap jump dan ulangi bersama gurumu.';
+    }
+    $('#r-msg').textContent=msg;
+  }
+
+  /* ---------- Reset ---------- */
+  var resetArmed=false,resetTimer=null;
+  function today(){
+    var d=new Date(),p=function(n){return String(n).padStart(2,'0');};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  function resetAll(){
+    state=fresh();
+    renderA();renderB();renderC();renderX();
+    ['a','b','c','x'].forEach(function(k){
+      $('#'+k+'-check').hidden=false;$('#'+k+'-score').hidden=true;
+    });
+    $('#d-text').value='';
+    $('#d-grade').value='0';
+    var t1=$('input[name="tier"][value="1"]');if(t1) t1.checked=true;
+    setTier(1);
+    refresh();
+  }
+
+  /* ---------- Wire up ---------- */
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+  function init(){
+    try{ $('#f-date').value=today(); }catch(e){}
+    state=fresh();
+    renderA();renderB();renderC();renderX();
+    $('#a-rows').addEventListener('click',function(e){
+      var b=e.target.closest('.chip');if(!b||b.disabled) return;
+      var i=b.getAttribute('data-a');state.a[i]=b.getAttribute('data-v');
+      $all('.chip[data-a="'+i+'"]').forEach(function(c){c.setAttribute('aria-pressed',String(c===b));});
+    });
+    $('#c-rows').addEventListener('click',function(e){
+      var b=e.target.closest('.opt');if(!b||b.disabled) return;
+      var i=b.getAttribute('data-c');state.c[i]=b.getAttribute('data-v');
+      $all('.opt[data-c="'+i+'"]').forEach(function(c){c.setAttribute('aria-pressed',String(c===b));});
+    });
+    $('#a-check').addEventListener('click',checkA);
+    $('#b-check').addEventListener('click',checkB);
+    $('#c-check').addEventListener('click',checkC);
+    $('#x-check').addEventListener('click',checkX);
+    $('#d-text').addEventListener('input',updateD);
+    $all('input[name="tier"]').forEach(function(r){r.addEventListener('change',function(){setTier(+r.value);});});
+    $('#d-grade').addEventListener('change',function(){state.dGrade=+this.value;refresh();});
+    $('#reset').addEventListener('click',function(){
+      var btn=$('#reset');
+      if(!resetArmed){
+        resetArmed=true;btn.textContent='Yakin? Tekan lagi untuk mulai ulang';
+        resetTimer=setTimeout(function(){resetArmed=false;btn.textContent='Mulai ulang';},4000);
+      } else {
+        clearTimeout(resetTimer);resetArmed=false;btn.textContent='Mulai ulang';resetAll();
+        window.scrollTo({top:0,behavior:'smooth'});
+      }
+    });
+    setTier(1);
+    refresh();
+  }
+})();
+</script>
+
+</body></html>
